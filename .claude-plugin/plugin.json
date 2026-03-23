@@ -1,0 +1,19 @@
+{
+  "name": "quicksight",
+  "version": "1.0.0",
+  "description": "AWS QuickSight skills for Claude Code — build analyses, manage datasets, deploy dashboards, and embed analytics programmatically",
+  "author": {
+    "name": "Riley Petersen"
+  },
+  "repository": "https://github.com/rpetersen/quicksight-plugin",
+  "license": "MIT",
+  "keywords": [
+    "quicksight",
+    "aws",
+    "analytics",
+    "dashboards",
+    "business-intelligence",
+    "datasets",
+    "spice"
+  ]
+}

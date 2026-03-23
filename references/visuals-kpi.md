@@ -1,0 +1,194 @@
+# KPI, Gauge, and Insight Visuals
+
+These visuals use **flat** field wells — fields go directly on the FieldWells object without a wrapper key like `AggregatedFieldWells`.
+
+---
+
+## KPIVisual
+
+### Field Wells (Flat Structure)
+
+```json
+{
+  "KPIVisual": {
+    "VisualId": "$VISUAL_ID",
+    "Title": {"Visibility": "VISIBLE", "FormatText": {"PlainText": "$TITLE"}},
+    "Subtitle": {"Visibility": "HIDDEN"},
+    "ChartConfiguration": {
+      "FieldWells": {
+        "Values": [
+          {
+            "NumericalMeasureField": {
+              "FieldId": "$FIELD_ID_VALUE",
+              "Column": {"DataSetIdentifier": "$DS_IDENTIFIER", "ColumnName": "$COLUMN"},
+              "AggregationFunction": {"SimpleNumericalAggregation": "SUM"}
+            }
+          }
+        ],
+        "TargetValues": [
+          {
+            "NumericalMeasureField": {
+              "FieldId": "$FIELD_ID_TARGET",
+              "Column": {"DataSetIdentifier": "$DS_IDENTIFIER", "ColumnName": "$TARGET_COLUMN"},
+              "AggregationFunction": {"SimpleNumericalAggregation": "SUM"}
+            }
+          }
+        ],
+        "TrendGroups": [
+          {
+            "DateDimensionField": {
+              "FieldId": "$FIELD_ID_TREND",
+              "Column": {"DataSetIdentifier": "$DS_IDENTIFIER", "ColumnName": "$DATE_COLUMN"},
+              "DateGranularity": "MONTH"
+            }
+          }
+        ]
+      },
+      "KPIOptions": {
+        "PrimaryValueDisplayType": "ACTUAL",
+        "Sparkline": {
+          "Visibility": "VISIBLE",
+          "Type": "LINE"
+        },
+        "VisualLayoutOptions": {
+          "StandardLayout": {
+            "Type": "VERTICAL"
+          }
+        },
+        "Comparison": {
+          "ComparisonMethod": "PERCENT_DIFFERENCE",
+          "ComparisonFormat": {
+            "NumberDisplayFormatConfiguration": {
+              "Suffix": "%",
+              "DecimalPlacesConfiguration": {"DecimalPlaces": 1}
+            }
+          }
+        }
+      },
+      "SortConfiguration": {}
+    },
+    "ColumnHierarchies": [],
+    "Actions": []
+  }
+}
+```
+
+### Key Points
+
+- **No wrapper key**: Fields go directly under `FieldWells.Values`, not `FieldWells.KPIAggregatedFieldWells.Values`
+- **Well limits**: Values (max 200), TargetValues (max 200), TrendGroups (max 200)
+- **PrimaryValueDisplayType**: `ACTUAL` (show the value), `COMPARISON` (show the delta), `AREA` (show sparkline area)
+- **Sparkline.Type is required** even when `Visibility: "HIDDEN"` — valid values: `LINE`, `AREA`
+- **VisualLayoutOptions.StandardLayout.Type**: `VERTICAL` (value on top, trend below) or `HORIZONTAL` (side by side)
+- **Comparison**: Populate `TargetValues` and set `ComparisonMethod` to `PERCENT_DIFFERENCE`, `DIFFERENCE`, or `PERCENT`
+
+### Conditional Formatting
+
+```json
+{
+  "ConditionalFormatting": {
+    "ConditionalFormattingOptions": [
+      {
+        "PrimaryValue": {
+          "TextColor": {
+            "Solid": {
+              "Expression": "{$MEASURE_COLUMN} < 50",
+              "Color": "#DE3B00"
+            }
+          },
+          "Icon": {
+            "IconSet": {
+              "Expression": "{$MEASURE_COLUMN}",
+              "IconSetType": "THREE_COLOR_ARROW"
+            }
+          }
+        }
+      }
+    ]
+  }
+}
+```
+
+---
+
+## GaugeChartVisual
+
+### Field Wells (Flat Structure)
+
+```json
+{
+  "GaugeChartVisual": {
+    "VisualId": "$VISUAL_ID",
+    "Title": {"Visibility": "VISIBLE", "FormatText": {"PlainText": "$TITLE"}},
+    "ChartConfiguration": {
+      "FieldWells": {
+        "Values": [
+          {
+            "NumericalMeasureField": {
+              "FieldId": "$FIELD_ID_VALUE",
+              "Column": {"DataSetIdentifier": "$DS_IDENTIFIER", "ColumnName": "$COLUMN"},
+              "AggregationFunction": {"SimpleNumericalAggregation": "SUM"}
+            }
+          }
+        ],
+        "TargetValues": [
+          {
+            "NumericalMeasureField": {
+              "FieldId": "$FIELD_ID_TARGET",
+              "Column": {"DataSetIdentifier": "$DS_IDENTIFIER", "ColumnName": "$TARGET_COLUMN"},
+              "AggregationFunction": {"SimpleNumericalAggregation": "SUM"}
+            }
+          }
+        ]
+      },
+      "GaugeChartOptions": {
+        "PrimaryValueDisplayType": "ACTUAL",
+        "Arc": {
+          "ArcAngle": 270,
+          "ArcThickness": "MEDIUM"
+        },
+        "ArcAxis": {
+          "Range": {
+            "Min": 0,
+            "Max": 100
+          }
+        }
+      }
+    },
+    "Actions": []
+  }
+}
+```
+
+### Key Points
+
+- **Well limits**: Values (max 200), TargetValues (max 200)
+- **ArcThickness**: `SMALL`, `MEDIUM`, `LARGE`
+- **ArcAngle**: Degrees of the arc (commonly 180 or 270)
+- **PrimaryValueDisplayType**: `ACTUAL`, `COMPARISON`, `HIDDEN`
+- No TrendGroups — gauge is a point-in-time visual
+
+---
+
+## InsightVisual
+
+InsightVisual is ML-powered and has limited programmatic control. It uses a `Computations` array and `InsightConfiguration` but the results are generated by QuickSight's ML engine.
+
+```json
+{
+  "InsightVisual": {
+    "VisualId": "$VISUAL_ID",
+    "DataSetIdentifier": "$DS_IDENTIFIER",
+    "Title": {"Visibility": "VISIBLE", "FormatText": {"PlainText": "$TITLE"}},
+    "InsightConfiguration": {
+      "Computations": [],
+      "CustomNarrative": {
+        "Narrative": "Custom text to display"
+      }
+    },
+    "Actions": []
+  }
+}
+```
+
+Not recommended for programmatic analysis generation — the output is non-deterministic and difficult to validate.
