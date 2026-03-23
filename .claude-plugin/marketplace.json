@@ -1,0 +1,21 @@
+{
+  "name": "quicksight-marketplace",
+  "owner": {
+    "name": "Riley Petersen"
+  },
+  "metadata": {
+    "description": "AWS QuickSight skills for Claude Code",
+    "version": "1.0.0"
+  },
+  "plugins": [
+    {
+      "name": "quicksight",
+      "source": {
+        "source": "url",
+        "url": "https://github.com/rileypetersen/quicksight-plugin.git"
+      },
+      "description": "AWS QuickSight skills — build analyses, manage datasets, deploy dashboards, and embed analytics programmatically",
+      "version": "1.0.0"
+    }
+  ]
+}
