@@ -14,7 +14,7 @@ The first comprehensive AWS QuickSight skill plugin for Claude Code. Build analy
 ## Installation
 
 ```bash
-claude plugin install rpetersen/quicksight-plugin
+claude plugin install rileypetersen/quicksight-plugin
 ```
 
 ## Prerequisites
