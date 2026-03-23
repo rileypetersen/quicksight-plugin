@@ -143,7 +143,7 @@ Flat string — no nesting at all.
 }
 ```
 
-### Percentage with Suffix
+### Percentage
 
 ```json
 {
@@ -158,8 +158,7 @@ Flat string — no nesting at all.
           "ThousandsSeparator": {
             "Visibility": "HIDDEN"
           }
-        },
-        "Suffix": "%"
+        }
       }
     }
   }
@@ -273,13 +272,16 @@ def currency_fmt(symbol: str = "$", decimal_places: int = 0) -> dict:
 
 ```python
 def pct_fmt(decimal_places: int = 1) -> dict:
-    """Build a PercentageDisplayFormatConfiguration."""
+    """Build a PercentageDisplayFormatConfiguration.
+
+    Note: Do NOT add Suffix "%" — PercentageDisplayFormatConfiguration
+    already formats values as percentages. Adding a suffix would produce "45%%".
+    """
     return {
         "FormatConfiguration": {
             "FormatConfiguration": {
                 "PercentageDisplayFormatConfiguration": {
-                    "DecimalPlacesConfiguration": {"DecimalPlaces": decimal_places},
-                    "Suffix": "%"
+                    "DecimalPlacesConfiguration": {"DecimalPlaces": decimal_places}
                 }
             }
         }

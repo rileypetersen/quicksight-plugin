@@ -177,7 +177,7 @@ maxOver({score}, [{team}], PRE_AGG)
 ```
 rankOver({score}, [{category}], DESC, PRE_AGG)
 denseRankOver({score}, [{category}], DESC, PRE_AGG)
-percentileOver({score}, [{category}], PRE_AGG)
+percentileOver({score}, 90, [{category}], PRE_AGG)
 ```
 
 **Syntax**: `rankOver({measure}, [{partition}], SORT_DIRECTION, LEVEL)`

@@ -8,11 +8,13 @@ set -euo pipefail
 
 ACCOUNT_ID=""
 PROFILE="default"
+REGION=""
 
 while [[ $# -gt 0 ]]; do
   case $1 in
     --account-id) ACCOUNT_ID="$2"; shift 2 ;;
     --profile)    PROFILE="$2"; shift 2 ;;
+    --region)     REGION="$2"; shift 2 ;;
     *)            echo "Unknown option: $1"; exit 1 ;;
   esac
 done
@@ -40,6 +42,7 @@ for ds in "${DATASETS[@]}"; do
   aws quicksight create-ingestion \
     --aws-account-id "$ACCOUNT_ID" \
     --profile "$PROFILE" \
+    ${REGION:+--region "$REGION"} \
     --data-set-id "$ds" \
     --ingestion-id "manual-${TIMESTAMP}-${ds}"
 done

@@ -275,19 +275,24 @@ aws quicksight update-template-alias \
 
 Deliver dashboard snapshots to stakeholders on a recurring schedule. Recipients do not need QuickSight accounts -- reports arrive as PDF attachments.
 
-```bash
-aws quicksight create-schedule \
-  --aws-account-id $ACCOUNT_ID --profile $PROFILE \
-  --schedule-id "weekly-exec-report" \
-  --dashboard-id $DASHBOARD_ID \
-  --schedule '{
-    "StartTime": "2024-01-01T08:00:00Z",
-    "ScheduleFrequency": {
-      "Interval": "WEEKLY",
-      "DayOfWeek": "MONDAY"
-    }
-  }' \
-  --email-destination '{"ToAddresses": ["team@example.com"]}'
+> **Note:** There is no `aws quicksight create-schedule` CLI command. Scheduled email delivery is configured through the QuickSight console UI, or programmatically via the `CreateSchedule` API using an AWS SDK (e.g., boto3). The CLI does not yet expose this operation.
+
+### boto3 example
+
+```python
+import boto3
+
+client = boto3.client("quicksight")
+client.create_schedule(
+    AwsAccountId="$ACCOUNT_ID",
+    ScheduleId="weekly-exec-report",
+    ScheduleName="Weekly Executive Report",
+    DashboardId="$DASHBOARD_ID",
+    Schedule={
+        "StartTime": "2024-01-01T08:00:00Z",
+        "ScheduleFrequency": {"Interval": "WEEKLY"},
+    },
+)
 ```
 
 Schedules do not transfer across accounts via asset bundles. Recreate them after migration. The dashboard must be published (not in draft state) for the schedule to execute.

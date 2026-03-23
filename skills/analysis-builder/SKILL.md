@@ -8,9 +8,9 @@ description: Build and modify AWS QuickSight analysis definitions programmatical
 Set AWS context for every command. All QuickSight API calls require account ID and region.
 
 ```bash
-export QS_ACCOUNT=$ACCOUNT_ID
-export QS_PROFILE=$PROFILE
-export QS_REGION=$REGION
+export ACCOUNT_ID=123456789012
+export PROFILE=production
+export REGION=us-east-1
 ```
 
 Two commands drive the workflow:
@@ -18,13 +18,13 @@ Two commands drive the workflow:
 ```bash
 # Export current state — always do this before modifying
 aws quicksight describe-analysis-definition \
-  --aws-account-id $QS_ACCOUNT --profile $QS_PROFILE \
+  --aws-account-id $ACCOUNT_ID --profile $PROFILE \
   --analysis-id $ANALYSIS_ID \
   --query 'Definition' > /tmp/qs-current.json
 
 # Push updated definition
 aws quicksight update-analysis \
-  --aws-account-id $QS_ACCOUNT --profile $QS_PROFILE \
+  --aws-account-id $ACCOUNT_ID --profile $PROFILE \
   --analysis-id $ANALYSIS_ID \
   --name "Analysis Name" \
   --definition file:///tmp/qs-analysis.json
@@ -62,8 +62,8 @@ Field IDs must be unique across ALL visuals in the entire analysis. Use determin
 ```python
 def field_id(dataset_alias, column_name, suffix=""):
     """Generate a deterministic, unique field ID."""
-    base = f"{dataset_alias}-{column_name}"
-    return f"{base}-{suffix}" if suffix else base
+    base = f"{dataset_alias}.{column_name}"
+    return f"{base}.{suffix}" if suffix else base
 ```
 
 ### Field builders
@@ -76,7 +76,7 @@ def measure_field(ds, col, agg="SUM", suffix="", prefix="", decimals=0):
              "AggregationFunction": {"SimpleNumericalAggregation": agg}}
     fmt = number_format(suffix=suffix, prefix=prefix, decimals=decimals)
     if fmt:
-        field["FormatConfiguration"] = {"FormatConfiguration": {"NumberFormatConfiguration": {"FormatConfiguration": fmt}}}
+        field["FormatConfiguration"] = {"FormatConfiguration": fmt}
     return {"NumericalMeasureField": field}
 
 def dim_field_date(ds, col, granularity="DAY"):
@@ -91,13 +91,14 @@ def dim_field_cat(ds, col):
         "Column": {"DataSetIdentifier": ds, "ColumnName": col}}}
 
 def number_format(suffix="", prefix="", decimals=0):
-    """Inner NumericFormatConfiguration. Prevents triple-nesting errors."""
+    """Inner NumericFormatConfiguration (the second FormatConfiguration level).
+    Returns the value for NumericalMeasureField > FormatConfiguration > FormatConfiguration."""
     cfg = {"SeparatorConfiguration": {"DecimalSeparator": "DOT",
            "ThousandsSeparator": {"Symbol": "COMMA", "Visibility": "VISIBLE"}},
            "DecimalPlacesConfiguration": {"DecimalPlaces": decimals}}
     if suffix: cfg["Suffix"] = suffix
     if prefix: cfg["Prefix"] = prefix
-    return {"NumericFormatConfiguration": cfg}
+    return {"NumberDisplayFormatConfiguration": cfg}
 
 def unagg_field(ds, col, fmt=None):
     """Flat TableUnaggregatedFieldWells entry. No type wrapper."""
@@ -147,7 +148,7 @@ Top-level keys in the definition object:
 {
     "DataSetIdentifierDeclarations": [...],  # max 50 datasets
     "Sheets": [...],                          # max 20 sheets
-    "ParameterDeclarations": [...],           # max 400 parameters
+    "ParameterDeclarations": [...],           # max 200 parameters
     "FilterGroups": [...],                    # max 2000 filter groups
     "CalculatedFields": [...],               # max 2000 calc fields
     "AnalysisDefaults": {...}                 # default sheet config
@@ -212,7 +213,7 @@ Field wells follow three structural patterns depending on the visual type. Mixin
 Values placed directly in FieldWells without a wrapper object.
 
 ```json
-{"KPIVisual": {"VisualId": "kpi-total", "DataSetIdentifier": "tickets",
+{"KPIVisual": {"VisualId": "kpi-total",
   "ChartConfiguration": {"FieldWells": {
     "Values": [{"NumericalMeasureField": {"FieldId": "...", "Column": {"DataSetIdentifier": "tickets", "ColumnName": "ticket_count"}, "AggregationFunction": {"SimpleNumericalAggregation": "SUM"}}}],
     "TargetValues": [], "TrendGroups": []
@@ -237,7 +238,7 @@ Tables support both `TableAggregatedFieldWells` and `TableUnaggregatedFieldWells
 
 ```json
 // CORRECT — flat
-"Values": [{"FieldId": "ds-name-unagg", "Column": {"DataSetIdentifier": "ds", "ColumnName": "name"}}]
+"Values": [{"FieldId": "ds.name.unagg", "Column": {"DataSetIdentifier": "ds", "ColumnName": "name"}}]
 
 // WRONG — do not wrap
 "Values": [{"UnaggregatedField": {"FieldId": "...", "Column": {...}}}]
@@ -367,12 +368,12 @@ Apply a theme to control colors, fonts, and UI chrome across the entire analysis
 
 ```bash
 aws quicksight create-theme \
-  --aws-account-id $QS_ACCOUNT --profile $QS_PROFILE \
+  --aws-account-id $ACCOUNT_ID --profile $PROFILE \
   --theme-id "my-dark-theme" --name "Dark Theme" --base-theme-id "MIDNIGHT" \
   --configuration '{"DataColorPalette": {"Colors": ["#3498DB","#2ECC71","#E74C3C","#F39C12"]}, "UIColorPalette": {"PrimaryBackground": "#1a1a2e", "PrimaryForeground": "#e0e0e0", "Accent": "#3498DB"}}'
 
 # Apply when pushing
---theme-arn "arn:aws:quicksight:$REGION:$QS_ACCOUNT:theme/my-dark-theme"
+--theme-arn "arn:aws:quicksight:$REGION:$ACCOUNT_ID:theme/my-dark-theme"
 ```
 
 - ThemeId: `[0-9a-zA-Z-]*` only. Built-in themes: `CLASSIC`, `MIDNIGHT`, `SEASIDE`, `RAINIER`.
@@ -387,14 +388,36 @@ These are the most common causes of CREATION_FAILED and blank visuals. Each incl
 
 ### 1. Double-nested FormatConfiguration
 
-The API nests format config three levels deep. Missing any level silently shows raw numbers.
+"FormatConfiguration" appears as a key name TWICE at different levels. The outer one is `NumberFormatConfiguration`, the inner one is `NumericFormatConfiguration`. Missing either level silently shows raw numbers.
 
-```python
-# CORRECT path: FormatConfiguration > FormatConfiguration > NumberFormatConfiguration > FormatConfiguration > NumericFormatConfiguration
-"FormatConfiguration": {"FormatConfiguration": {"NumberFormatConfiguration": {"FormatConfiguration": {"NumericFormatConfiguration": {"Suffix": "%", "DecimalPlacesConfiguration": {"DecimalPlaces": 1}}}}}}
+For a NumericalMeasureField, the correct nesting is:
 
-# WRONG — missing middle layer
-"FormatConfiguration": {"NumberFormatConfiguration": {"NumericFormatConfiguration": {"Suffix": "%"}}}
+```
+NumericalMeasureField.FormatConfiguration (NumberFormatConfiguration)
+  └─ FormatConfiguration (NumericFormatConfiguration)
+       ├─ NumberDisplayFormatConfiguration
+       ├─ CurrencyDisplayFormatConfiguration
+       └─ PercentageDisplayFormatConfiguration
+```
+
+```json
+// CORRECT — two FormatConfiguration keys, outer is NumberFormatConfiguration, inner is NumericFormatConfiguration
+{"NumericalMeasureField": {
+  "FieldId": "...", "Column": {"DataSetIdentifier": "ds", "ColumnName": "col"},
+  "AggregationFunction": {"SimpleNumericalAggregation": "SUM"},
+  "FormatConfiguration": {
+    "FormatConfiguration": {
+      "NumberDisplayFormatConfiguration": {
+        "Suffix": "%",
+        "DecimalPlacesConfiguration": {"DecimalPlaces": 1},
+        "SeparatorConfiguration": {"DecimalSeparator": "DOT", "ThousandsSeparator": {"Symbol": "COMMA", "Visibility": "VISIBLE"}}
+      }
+    }
+  }
+}}
+
+// WRONG — skips the outer NumberFormatConfiguration wrapper
+{"FormatConfiguration": {"NumberDisplayFormatConfiguration": {"Suffix": "%"}}}
 ```
 
 ### 2. Field IDs must be globally unique
@@ -403,8 +426,8 @@ Every FieldId across all visuals in the entire analysis must be unique. Reusing 
 
 ```python
 # CORRECT — include visual context in field ID
-field_id("tickets", "count", "kpi-overview")   # "tickets-count-kpi-overview"
-field_id("tickets", "count", "chart-trend")     # "tickets-count-chart-trend"
+field_id("tickets", "count", "kpi-overview")   # "tickets.count.kpi-overview"
+field_id("tickets", "count", "chart-trend")     # "tickets.count.chart-trend"
 
 # WRONG — same ID in two visuals
 field_id("tickets", "count")  # used in both KPI and chart
@@ -443,16 +466,25 @@ If a KPI has a TrendGroups field well, the KPIOptions must include a Sparkline c
 
 Covered in Pattern C above. Do not wrap unaggregated field entries in a type object.
 
-### 6. Table sort uses ColumnSort, not UnaggregatedSort
+### 6. Table sort uses ColumnSort, not FieldSort or UnaggregatedSort
+
+For unaggregated tables, use `ColumnSort` (not `FieldSort`):
 
 ```json
-// CORRECT
+// CORRECT — ColumnSort with SortBy column reference
 "SortConfiguration": {
     "RowSort": [{
-        "FieldSort": {
-            "FieldId": "ds-score-unagg",
+        "ColumnSort": {
+            "SortBy": {"DataSetIdentifier": "ds", "ColumnName": "score"},
             "Direction": "DESC"
         }
+    }]
+}
+
+// WRONG — FieldSort does not work for unaggregated tables
+"SortConfiguration": {
+    "RowSort": [{
+        "FieldSort": {"FieldId": "ds.score.unagg", "Direction": "DESC"}
     }]
 }
 
@@ -507,14 +539,14 @@ Setting `CrossDataset: "ALL_DATASETS"` on a filter that references a column not 
 python3 build_analysis.py --dry-run  # writes /tmp/qs-analysis.json
 
 # 2. Push with lenient validation
-aws quicksight update-analysis --aws-account-id $QS_ACCOUNT --profile $QS_PROFILE \
+aws quicksight update-analysis --aws-account-id $ACCOUNT_ID --profile $PROFILE \
   --analysis-id $ANALYSIS_ID --name "My Analysis" \
   --definition file:///tmp/qs-analysis.json --validation-strategy '{"Mode": "LENIENT"}'
 
 # 3. Check status and errors
-aws quicksight describe-analysis --aws-account-id $QS_ACCOUNT --profile $QS_PROFILE \
+aws quicksight describe-analysis --aws-account-id $ACCOUNT_ID --profile $PROFILE \
   --analysis-id $ANALYSIS_ID --query 'Analysis.Status'
-aws quicksight describe-analysis --aws-account-id $QS_ACCOUNT --profile $QS_PROFILE \
+aws quicksight describe-analysis --aws-account-id $ACCOUNT_ID --profile $PROFILE \
   --analysis-id $ANALYSIS_ID --query 'Analysis.Errors'
 ```
 
@@ -533,11 +565,11 @@ aws quicksight describe-analysis --aws-account-id $QS_ACCOUNT --profile $QS_PROF
 
 These companion files contain detailed structures. Read only the file relevant to your current task.
 
-- `references/visuals-kpi.md` — KPI visual JSON with sparklines, comparisons, conditional formatting
-- `references/visuals-charts.md` — Line, bar, combo, pie chart field wells and options
-- `references/visuals-tables.md` — Table and pivot table configuration, aggregated and unaggregated
-- `references/visuals-comparison.md` — Gauge, funnel, waterfall, tree map visuals
-- `references/visuals-specialized.md` — Geospatial, word cloud, sankey, box plot
+- `references/visuals-kpi.md` — KPI, Gauge, Insight (flat field well pattern)
+- `references/visuals-charts.md` — Bar, Line, Combo, Pie, Funnel (wrapped pattern)
+- `references/visuals-tables.md` — Table, PivotTable, HeatMap (dual-mode and aggregated)
+- `references/visuals-comparison.md` — ScatterPlot, Waterfall, BoxPlot, Histogram
+- `references/visuals-specialized.md` — TreeMap, Sankey, Radar, FilledMap, Geospatial, WordCloud
 - `references/format-patterns.md` — Number/date/currency format configuration, conditional formatting, icon sets
 - `references/calculated-fields.md` — Expression syntax, function catalog, window functions, LAC-W
 - `references/api-gotchas.md` — Full list of API pitfalls, edge cases, and debugging procedures
